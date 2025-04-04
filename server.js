@@ -38,6 +38,11 @@ const authenticateToken = (req, res, next) => {
 };
 
 
+app.get('/api/endpoint', (req, res) => {
+    console.log("Received a request at /api/endpoint");
+    res.json({ message: "Success" });
+});
+
 // 🟢 הרשמה של משתמש חדש
 app.post('/signup', async (req, res) => {
     const { username, password, instrument, role, type = 'user' } = req.body;
