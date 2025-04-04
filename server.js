@@ -5,7 +5,7 @@ import http from 'http';
 import { Server } from 'socket.io';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import pool from './db.js'; // הוספנו את חיבור למסד הנתונים
+import pool from './db.js'; 
 import jwt from 'jsonwebtoken';
 import { fileURLToPath } from 'url';
 
