@@ -1,11 +1,13 @@
+import fs from 'fs';
+import path from 'path';
 import express from 'express';
 import http from 'http';
 import { Server } from 'socket.io';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import pool from './db.js'; // הוספנו את חיבור למסד הנתונים
-import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import { fileURLToPath } from 'url';
 
 dotenv.config(); // טוען משתנים מקובץ .env
 
@@ -35,28 +37,6 @@ const authenticateToken = (req, res, next) => {
     });
 };
 
-// מאזין לחיבורים חדשים ב-Socket.io
-io.on('connection', (socket) => {
-    console.log('A user connected:', socket.id);
-
-    // מצרף משתמש לחזרה לפי מזהה
-    socket.on('joinSession', (sessionId) => {
-        socket.join(sessionId);
-        console.log(`User ${socket.id} joined session ${sessionId}`);
-    });
-
-    // כאשר האדמין בוחר שיר, כולם רואים אותו
-    socket.on('songSelected', ({ sessionId, song }) => {
-        io.to(sessionId).emit('updateSong', song);
-        console.log(`Song updated in session ${sessionId}:`, song);
-    });
-
-    // כשהאדמין מסיים חזרה, כל המשתמשים מתנתקים
-    socket.on('endSession', (sessionId) => {
-        io.to(sessionId).emit('sessionEnded');
-        console.log(`Session ${sessionId} ended.`);
-    });
-});
 
 // 🟢 הרשמה של משתמש חדש
 app.post('/signup', async (req, res) => {
@@ -71,8 +51,6 @@ app.post('/signup', async (req, res) => {
             console.log('User already exists');  // הדפס ב-console כדי לוודא שהבעיה היא כאן
             return res.status(400).json({ error: 'Username already exists' });
         }
-
-
 
         // הוספת משתמש חדש
         const result = await pool.query(
@@ -100,27 +78,20 @@ app.post('/signup', async (req, res) => {
 app.post('/login', async (req, res) => {
     const { username, password } = req.body;
     try {
-        console.log("may is here!!!!s")
         const result = await pool.query('SELECT * FROM users WHERE username = $1', [username]);
         if (result.rows.length === 0) return res.status(401).json({ error: "User not found" });
-        console.log("2")
-
 
         const user = result.rows[0];
         // const isMatch = await bcrypt.compare(password, user.password);
         const isMatch = password === user.password;
         if (!isMatch) return res.status(401).json({ error: "Invalid password" });
-        console.log("3")
 
         // יצירת טוקן עם מידע על המשתמש
         // const token = jwt.sign({ id: user.id, type: user.type }, process.env.JWT_SECRET, { expiresIn: '2h' });
-        console.log("4")
         // שליחת התפקיד כחלק מהתגובה
         res.json({ user: { id: user.id, username: user.username, instrument: user.instrument, role: user.role, type: user.type } });
     } catch (err) {
         res.status(500).json({ error: err.message });
-        console.log("21")
-
     }
 });
 
@@ -150,6 +121,130 @@ app.post('/join', authenticateToken, async (req, res) => {
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
+});
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Now you can use __dirname as usual
+console.log(__dirname);
+
+// Endpoint to get the song by name
+app.get('/song/:name', (req, res) => {
+    console.log("yovel here")
+    const { name } = req.params;
+    console.log("get song", {name})
+    
+    // Construct the path to the song JSON file
+    const songFilePath = path.join(__dirname, 'data-songs', `${name}.json`); // Assuming your song files are in a 'songs' directory
+
+    console.log("path", {songFilePath})
+    
+    // Check if the file exists
+    fs.readFile(songFilePath, 'utf8', (err, data) => {
+        if (err) {
+            // Handle file read error (e.g., file not found)
+            return res.status(404).json({ error: err });
+        }
+
+        try {
+            // Parse the song data from the JSON file
+            const songData = JSON.parse(data);
+            res.json(songData); // Send the song data as JSON to the client
+        } catch (parseError) {
+            // Handle JSON parsing error
+            return res.status(500).json({ error: 'Error parsing song data' });
+        }
+    });
+});
+
+// // Start the server
+// app.listen(port, () => {
+//     console.log(`Server is running on http://localhost:${port}`);
+// });
+
+
+app.get('/songs', (req, res) => {
+    const songsDir = path.join(process.cwd(), 'data-songs');
+
+    fs.readdir(songsDir, (err, files) => {
+        if (err) {
+            console.error('Error reading songs directory:', err);
+            return res.status(500).json({ error: 'Failed to read songs' });
+        }
+
+        const songs = [];
+
+        files.forEach((file) => {
+            if (file.endsWith('.json')) {
+                const filePath = path.join(songsDir, file);
+                const rawData = fs.readFileSync(filePath, 'utf-8');
+                const songData = JSON.parse(rawData);
+
+                // הוספת שם השיר מהקובץ עצמו (ללא הסיומת .json)
+                const songTitle = path.basename(file, '.json');
+
+                // אם קובץ ה-JSON מכיל מערך של שירים, נוסיף לכל שיר את שם השיר
+                if (Array.isArray(songData)) {
+                    songData.forEach(song => {
+                        // מניע כפילויות
+                        if (!songs.some(existingSong => existingSong.title === songTitle && existingSong.chords === song.chords)) {
+                            songs.push({ title: songTitle, ...song });
+                        }
+                    });
+                } else {
+                    // מניע כפילויות
+                    if (!songs.some(existingSong => existingSong.title === songTitle && existingSong.chords === songData.chords)) {
+                        songs.push({ title: songTitle, ...songData });
+                    }
+                }
+            }
+        });
+
+        res.json(songs);
+    });
+});
+
+let currentSong = null; // משתנה גלובלי לשמירת השיר הנבחר
+
+io.on('connection', (socket) => {
+    console.log('A user connected:', socket.id);
+
+    // שליחת השיר האחרון שנבחר למשתמש שמתחבר
+    if (currentSong) {
+        socket.emit('currentSong', { song: currentSong });
+    }
+
+    socket.on('getCurrentSong', () => {
+        if (currentSong) {
+            socket.emit('currentSong', { song: currentSong });
+        }
+    });
+
+    // Join a session based on a sessionId
+    socket.on('joinSession', (sessionId) => {
+        socket.join(sessionId);  // Join the specified room/session
+        console.log(`Socket ${socket.id} joined session ${sessionId}`);
+    });
+
+    // אזנים לאירוע 'songSelected' בתוך פונקציית החיבור
+    socket.on('songSelected', ({ sessionId, song }) => {
+        currentSong = song;
+        io.to(sessionId).emit('changeStatus', { sessionId, status: "Live", song: currentSong });
+        io.emit('songSelected', { song: currentSong }); // שליחת השיר לכל המשתמשים
+        console.log(`changing status ${sessionId}:`, song);
+    });
+
+    // לאירועים אחרים שקשורים ל-socket
+    socket.on('endSession', (sessionId) => {
+        io.to(sessionId).emit('changeStatus');
+        console.log(`Session ${sessionId} ended.`);
+    });
+
+    // כאשר אדמין לוחץ על Quit, משדר לכל המשתמשים לצאת
+    socket.on('adminQuit', () => {
+        console.log('Admin requested quit - broadcasting to all clients');
+        io.emit('forceQuit'); // שולח לכל הלקוחות
+    });
 });
 
 // נתיב בדיקה
