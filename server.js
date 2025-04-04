@@ -262,5 +262,5 @@ app.get('/', (req, res) => {
 //    console.log('Server running on port 5000');
 //});
 
-//export default app;
-module.exports = app;
+export default app;
+//module.exports = app;
