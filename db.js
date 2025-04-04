@@ -1,20 +1,19 @@
 import pkg from 'pg';
 import dotenv from 'dotenv';
 
-dotenv.config(); // טוען משתנים מקובץ .env
+dotenv.config(); 
 const { Pool } = pkg;
 
 const pool = new Pool({
-    connectionString: process.env.DATABASE_URL // משתמש במשתנה DATABASE_URL מקובץ .env לחיבור מסד הנתונים 
+    connectionString: process.env.DATABASE_URL
 });
 
-// בדיקת חיבור למסד הנתונים
 pool.connect()
     .then(() => {
-        console.log('Connected to the database successfully'); // הודעת הצלחה אם החיבור הצליח
+        console.log('Connected to the database successfully');
     })
     .catch((err) => {
-        console.error('Error connecting to the database:', err.message); // הודעת שגיאה אם החיבור נכשל
+        console.error('Error connecting to the database:', err.message);
     });
 
 export default pool;
