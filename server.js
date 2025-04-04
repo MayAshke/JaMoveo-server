@@ -10,6 +10,7 @@ import jwt from 'jsonwebtoken';
 import { fileURLToPath } from 'url';
 
 dotenv.config(); // טוען משתנים מקובץ .env
+const PORT = process.env.PORT || 3000; // Use the port provided by Render or default to 3000
 
 const app = express(); // יוצרים מופע של השרת בעזרת express
 const server = http.createServer(app); // יוצרים שרת HTTP מבוסס על Express
@@ -258,9 +259,9 @@ app.get('/', (req, res) => {
 });
 
 // הפעלת השרת
-//server.listen(5000, () => {
-//    console.log('Server running on port 5000');
-//});
+server.listen(PORT, () => {
+    console.log('Server running on port 5000');
+});
 
 export default app;
 //module.exports = app;
